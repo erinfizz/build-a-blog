@@ -28,7 +28,8 @@ class Content(db.Model):
         
 class MainPage(Handler):
     def render_base(self, title="", content="", error=""):
-        self.render("base.html", title=title, content=content, error=error)
+        contents = db.GqlQuery("SELECT * FROM Content ORDER By created DESC")
+        self.render("base.html", title=title, content=content, error=error, contents=contents)
     def get(self):
         self.render_base()
         
@@ -37,14 +38,64 @@ class MainPage(Handler):
         content = self.request.get("content")
         
         if title and content:
-            self.write("whee!")
+            c = Content(title=title, content = content)
+            c.put()
+            
+            self.redirect("/")
             
         else:
             error = "there must be both a title and a blog post!"
             self.render_base(title, content, error)
-        
 
+class BlogPage(Handler):
+    def render_blog(self, title="", content=""):
+        contents = db.GqlQuery("SELECT * FROM Content ORDER by created DESC LIMIT 5")
+        self.render("blog.html", title=title, content=content, contents=contents)
+    def get(self):
+        self.render_blog()
+    
+        
+    
+class NewPost(Handler):
+    def render_new(self, title="", content="", error=""):
+        contents = db.GqlQuery("SELECT * FROM Content ORDER By created DESC")
+        self.render("newpost.html", title=title, content=content, error=error, contents=contents)
+    def get(self):
+        self.render_new()
+        
+    def post(self):
+        title = self.request.get("title")
+        content = self.request.get("content")
+        
+        if title and content:
+            c = Content(title=title, content = content)
+            c.put()
+            
+            post_id = c.key().id()
+            
+            self.redirect("/blog/" + str(post_id))
+            
+        else:
+            error = "there must be both a title and a blog post!"
+            self.render_new(title, content, error)
+        
+class ViewPostHandler(Handler):
+    
+    def get(self, id):
+        if Content.get_by_id(int(id)) == None:
+            error = "That doesn't exist!"
+            self.response.write(error)
+        
+        else:
+            post_id = Content.get_by_id(int(id))
+            self.render("single.html", post_id= post_id )
+
+        
+    
 
 app = webapp2.WSGIApplication([
-    ('/', MainPage)
+    ('/', MainPage), 
+    ('/blog', BlogPage), 
+    ('/newpost', NewPost),
+    webapp2.Route('/blog/<id:\d+>', ViewPostHandler)
 ], debug=True)
